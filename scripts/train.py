@@ -5,6 +5,9 @@
 # Organisation: searchInk
 # Email: christopher@searchink.com
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).absolute().parent.parent))
 
 from main.model.squeezeDet import  SqueezeDet
 from main.model.dataGenerator import generator_from_data_path
