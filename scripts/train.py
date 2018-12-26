@@ -7,15 +7,15 @@
 
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).absolute().parent.parent))
+root_folder = str(Path(__file__).absolute().parent.parent)
+sys.path.append(root_folder)
 
-from main.model.squeezeDet import  SqueezeDet
 from main.model.dataGenerator import generator_from_data_path
 import keras.backend as K
 from keras import optimizers
 import tensorflow as tf
 from keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau
-from main.model.modelLoading import load_only_possible_weights
+from main.model.modelLoading import *
 from main.model.multi_gpu_model_checkpoint import  ModelCheckpointMultiGPU
 import argparse
 import os
@@ -29,7 +29,7 @@ from main.config.create_config import load_dict
 img_file = "img_train.txt"
 gt_file = "gt_train.txt"
 log_dir_name = './log'
-init_file = "imagenet.h5"
+init_file = ""
 EPOCHS = 100
 STEPS = None
 OPTIMIZER = "default"
@@ -84,7 +84,7 @@ def train():
     cfg.gt_file = gt_file
     cfg.images = img_names
     cfg.gts = gt_names
-    cfg.init_file = init_file
+    cfg.init_file = get_init_file(cfg) if init_file == '' else init_file
     cfg.EPOCHS = EPOCHS
     cfg.OPTIMIZER = OPTIMIZER
     cfg.CUDA_VISIBLE_DEVICES = CUDA_VISIBLE_DEVICES
@@ -131,7 +131,7 @@ def train():
 
 
     #instantiate model
-    squeeze = SqueezeDet(cfg)
+    squeeze = get_model(cfg)
 
 
     #callbacks
@@ -184,7 +184,7 @@ def train():
     if REDUCELRONPLATEAU:
 
         reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.1,verbose=1,
-                                      patience=5, min_lr=0.0)
+                                      patience=10, min_lr=1e-6)
 
         cb.append(reduce_lr)
 
@@ -192,10 +192,10 @@ def train():
     if VERBOSE:
         print(squeeze.model.summary())
 
-    if init_file != "none":
+    if cfg.init_file != '':
 
-
-        print("Weights initialized by name from {}".format(init_file))
+        _file = root_folder+'/'+cfg.init_file if '/' not in cfg.init_file else cfg.init_file
+        print("Weights initialized by name from {}".format(_file))
 
         load_only_possible_weights(squeeze.model, init_file, verbose=VERBOSE)
 

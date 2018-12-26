@@ -9,6 +9,17 @@
 import h5py
 import numpy as np
 
+def _is_squeese_det(config):
+    return ('MODEL' not in config) or (config.MODEL == "SqueezeDet")
+
+def get_model(config):
+    from .squeezeDet import  SqueezeDet
+    from .mn2det import MN2Det
+    return SqueezeDet(config) if _is_squeese_det(config) else MN2Det(config)
+
+def get_init_file(config):
+    return "imagenet.h5" if _is_squeese_det(config) else ""
+
 def load_only_possible_weights(model, weights_file, verbose = False):
     """
     Sets the weights of a model manually by layer name, even if the length of each dimensions does not match.

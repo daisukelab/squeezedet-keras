@@ -7,10 +7,11 @@
 
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).absolute().parent.parent))
+root_folder = str(Path(__file__).absolute().parent.parent)
+sys.path.append(root_folder)
 
-from main.model.squeezeDet import  SqueezeDet
 from main.model.dataGenerator import generator_from_data_path, visualization_generator_from_data_path
+from main.model.modelLoading import *
 import keras.backend as K
 from keras import optimizers
 import tensorflow as tf
@@ -235,7 +236,7 @@ def eval():
 
 
     #instantiate model
-    squeeze = SqueezeDet(cfg)
+    squeeze = get_model(cfg)
 
     #dummy optimizer for compilation
     sgd = optimizers.SGD(lr=cfg.LEARNING_RATE, decay=0, momentum=cfg.MOMENTUM,

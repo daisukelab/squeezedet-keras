@@ -10,6 +10,28 @@ import cv2
 import numpy as np
 import random
 from main.utils.utils import bbox_transform_inv, batch_iou, sparse_to_dense
+
+import albumentations as A
+
+_augmentor = None
+def _aug(config):
+    global _augmentor
+    if _augmentor is None:
+        _augmentor = A.Compose([
+            A.VerticalFlip(p=0.4),
+            A.RandomSizedBBoxSafeCrop(width=config.IMAGE_WIDTH, height=config.IMAGE_HEIGHT, erosion_rate=0.0, p=0.4),
+            A.RGBShift(p=0.4),
+            A.Blur(blur_limit=7, p=0.4),
+            A.RandomBrightness(p=0.4),
+        ], bbox_params={'format':'coco', 'min_area': 0, 'min_visibility': 0, 'label_fields': ['labels']}, p=0.4)
+    return _augmentor
+
+def fix_bbox(h, w, bbox):
+    x, y, x2, y2 = bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]
+    x, y, x2, y2 = max(0, x), max(0, y), min(w, x2), min(h, y2)
+    return [x, y, x2 - x, y2 - y]
+
+
 class threadsafe_iter:
     """Takes an iterator/generator and makes it thread-safe by
     serializing call to the `next` method of given iterator/generator.
@@ -67,7 +89,7 @@ def read_image_and_gt(img_files, gt_files, config):
             #get class, if class is not in listed, skip it
             try:
                 cls = config.CLASS_TO_IDX[obj[0].lower().strip()]
-                # print cls
+                # print(cls)
 
 
                 #get coordinates
@@ -92,6 +114,7 @@ def read_image_and_gt(img_files, gt_files, config):
                 annotations.append([x, y, w, h, cls])
 
             except:
+                print(obj)
                 continue
         return annotations
 
@@ -130,51 +153,18 @@ def read_image_and_gt(img_files, gt_files, config):
         bboxes_per_file = np.array([a[0:4]for a in annotations])
 
 
-        #TODO enable dynamic Data Augmentation
-        """
-
-        if config.DATA_AUGMENTATION:
-            assert mc.DRIFT_X >= 0 and mc.DRIFT_Y > 0, \
-                'mc.DRIFT_X and mc.DRIFT_Y must be >= 0'
-
-            if mc.DRIFT_X > 0 or mc.DRIFT_Y > 0:
-                # Ensures that gt boundibg box is not cutted out of the image
-                max_drift_x = min(gt_bbox[:, 0] - gt_bbox[:, 2] / 2.0 + 1)
-                max_drift_y = min(gt_bbox[:, 1] - gt_bbox[:, 3] / 2.0 + 1)
-                assert max_drift_x >= 0 and max_drift_y >= 0, 'bbox out of image'
-
-                dy = np.random.randint(-mc.DRIFT_Y, min(mc.DRIFT_Y + 1, max_drift_y))
-                dx = np.random.randint(-mc.DRIFT_X, min(mc.DRIFT_X + 1, max_drift_x))
-
-                # shift bbox
-                gt_bbox[:, 0] = gt_bbox[:, 0] - dx
-                gt_bbox[:, 1] = gt_bbox[:, 1] - dy
-
-                # distort image
-                orig_h -= dy
-                orig_w -= dx
-                orig_x, dist_x = max(dx, 0), max(-dx, 0)
-                orig_y, dist_y = max(dy, 0), max(-dy, 0)
-
-                distorted_im = np.zeros(
-                    (int(orig_h), int(orig_w), 3)).astype(np.float32)
-                distorted_im[dist_y:, dist_x:, :] = im[orig_y:, orig_x:, :]
-                im = distorted_im
-
-            # Flip image with 50% probability
-            if np.random.randint(2) > 0.5:
-                im = im[:, ::-1, :]
-                gt_bbox[:, 0] = orig_w - 1 - gt_bbox[:, 0]
-
-
-        """
-
-
-
-
+        #dynamic Data Augmentation
+        img = np.asarray(img)
+        bboxes_per_file = [fix_bbox(*img.shape[:2], bbox) for bbox in bboxes_per_file]
+        #print(bboxes_per_file)
+        annotations = {'image': img, 'bboxes': bboxes_per_file, 'labels': labels_per_file}
+        augmented = _aug(config)(**annotations)
+        img = augmented['image']
+        bboxes_per_file = np.array(augmented['bboxes'])
+        labels_per_file = augmented['labels']
 
         #and store
-        imgs[img_idx] = np.asarray(img)
+        imgs[img_idx] = img
         
         img_idx += 1
 

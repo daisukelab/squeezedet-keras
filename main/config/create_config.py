@@ -137,6 +137,8 @@ def load_dict(path):
     cfg.CLASSES = len(cfg.CLASS_NAMES)
     cfg.CLASS_TO_IDX = dict(zip(cfg.CLASS_NAMES, range(cfg.CLASSES)))
 
+    #defaults
+    cfg.MODEL = cfg.MODEL if 'MODEL' in cfg else "SqueezeDet"
 
 
     return cfg
